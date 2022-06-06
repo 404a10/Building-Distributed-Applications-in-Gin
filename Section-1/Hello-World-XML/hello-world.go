@@ -13,8 +13,8 @@ type Person struct {
 }
 
 func indexHandler(c *gin.Context) {
-	c.XML(200, Person{FirstName: "Jexu Rinkong",
-		LastName: "Albarran"})
+	c.XML(200, Person{FirstName: "Debra",
+		LastName: "T Patterson"})
 }
 
 func main() {
