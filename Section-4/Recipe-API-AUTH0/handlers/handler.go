@@ -12,7 +12,6 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 	"log"
 	"net/http"
-	"os"
 	"time"
 )
 
@@ -27,15 +26,6 @@ func NewRecipesHandler(ctx context.Context, collection *mongo.Collection, redisC
 		collection:  collection,
 		ctx:         ctx,
 		redisClient: redisClient,
-	}
-}
-
-func AuthMiddleware() gin.HandlerFunc {
-	return func(c *gin.Context) {
-		if c.GetHeader("X-API-KEY") != os.Getenv("X_API_KEY") {
-			c.AbortWithStatus(401)
-		}
-		c.Next()
 	}
 }
 

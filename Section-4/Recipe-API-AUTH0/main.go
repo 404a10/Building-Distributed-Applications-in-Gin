@@ -4,6 +4,8 @@ import (
 	"BDA/recipe-api/handlers"
 	"context"
 	"fmt"
+	"github.com/gin-contrib/sessions"
+	redisStore "github.com/gin-contrib/sessions/redis"
 	"github.com/gin-gonic/gin"
 	"github.com/go-redis/redis"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -13,9 +15,8 @@ import (
 	"os"
 )
 
-//how to run: X_API_KEY=eUbP9shywUygMx7u MONGO_URI="mongodb://admin:password@localhost:27017/test?authSource=admin" MONGO_DATABASE=test go run *.go
-
 var recipesHandler *handlers.RecipesHandler
+var authHandler *handlers.AuthHandler
 
 func init() {
 	redisClient := redis.NewClient(&redis.Options{
@@ -33,22 +34,32 @@ func init() {
 	log.Println("Connected to mongodb")
 	collection := client.Database(os.Getenv("MONGO_DATABASE")).Collection("recipes")
 	recipesHandler = handlers.NewRecipesHandler(ctx, collection, redisClient)
+	authHandler = &handlers.AuthHandler{}
+	collectionUsers := client.Database(os.Getenv("MONGO_DATABASE")).Collection("users")
+	authHandler = handlers.NewAuthHandler(ctx, collectionUsers)
 }
 
 func main() {
 	router := gin.Default()
+
+	store, _ := redisStore.NewStore(10, "tcp", "localhost:6379", "", []byte("secret"))
+	router.Use(sessions.Sessions("recipes_api", store))
+
 	router.GET("/recipes", recipesHandler.ListRecipesHandler)
+	router.POST("/signin", authHandler.SignInHandler)
+	router.POST("/signout", authHandler.SignOutHandler)
+	router.POST("/refresh", authHandler.RefreshHandler)
 	authorized := router.Group("/")
-	authorized.Use(handlers.AuthMiddleware())
+	authorized.Use(authHandler.AuthMiddleware())
 	{
 		authorized.POST("/recipes", recipesHandler.NewRecipeHandler)
 		authorized.PUT("/recipes/:id", recipesHandler.UpdateRecipeHandler)
 		authorized.GET("/recipes/:id", recipesHandler.GetRecipe)
 		authorized.DELETE("/recipes/:id", recipesHandler.DeleteRecipe)
 	}
-	err := router.Run(":5000")
+	//adding the self-signed certificate and the private key
+	err := router.RunTLS(":443", "certs/localhost.crt", "certs/localhost.key")
 	if err != nil {
 		log.Fatalln("Error:", err)
 	}
-
 }
